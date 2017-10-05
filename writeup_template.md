@@ -37,54 +37,37 @@ I used the following source and destination points:
 
 #### 3. Describe how (and identify where in your code) you used color transforms, gradients or other methods to create a thresholded binary image.  Provide an example of a binary image result.
 
-I used a combination of color and gradient thresholds to generate a binary image through my functions abs_sobel, mag_thresh, and dir_threshold from lines 51 to 88 .  Here's an example of my output for this step.  
+I used a combination of color and gradient thresholds to generate a binary image through my functions `hls_select`, `abs_sobel`, and `yw_combinator` from lines 61 to 127.  Here's an example of my output for this step.  
 
 ![image3](./writeup/thresh.png)
 
-```python
-src = np.float32(
-    [[(img_size[0] / 2) - 55, img_size[1] / 2 + 100],
-    [((img_size[0] / 6) - 10), img_size[1]],
-    [(img_size[0] * 5 / 6) + 60, img_size[1]],
-    [(img_size[0] / 2 + 55), img_size[1] / 2 + 100]])
-dst = np.float32(
-    [[(img_size[0] / 4), 0],
-    [(img_size[0] / 4), img_size[1]],
-    [(img_size[0] * 3 / 4), img_size[1]],
-    [(img_size[0] * 3 / 4), 0]])
-```
+I basically combined different combinations of thresholds for the HSL color space tailored to detect yellow and white colors in into my variable combine_all to detect the binary image.
 
-
-![alt text][image4]
 
 #### 4. Describe how (and identify where in your code) you identified lane-line pixels and fit their positions with a polynomial?
 
-Then I did some other stuff and fit my lane lines with a 2nd order polynomial kinda like this:
+Then I used the find_lanes function in my program to detect lines in the program and fit polynomials to the detected lines. I used the sliding window based histogram approach first to identify the position of the lines in a 9 layer subsegmentation of the image and then used the `polyfit` functions to fit the polynomials to it. the output looked like this on the test images:
 
-![alt text][image5]
+![image3](./writeup/fit.png)
 
 #### 5. Describe how (and identify where in your code) you calculated the radius of curvature of the lane and the position of the vehicle with respect to center.
 
-I did this in lines # through # in my code in `my_other_file.py`
+I did this in lines 213 through 214 in my code in with the functions `get_curvature` and `get_offset`.
 
 #### 6. Provide an example image of your result plotted back down onto the road such that the lane area is identified clearly.
 
-I implemented this step in lines # through # in my code in `yet_another_file.py` in the function `map_lane()`.  Here is an example of my result on a test image:
+I implemented this step in lines 244 through 261 in my code in adv_lane_lines in the function `project_back`.  Here is an example of my result on a test image:
 
-![alt text][image6]
-
+![image3](./writeup/back_proj.png)
 ---
 
 ### Pipeline (video)
 
-#### 1. Provide a link to your final video output.  Your pipeline should perform reasonably well on the entire project video (wobbly lines are ok but no catastrophic failures that would cause the car to drive off the road!).
-
-Here's a [link to my video result](./project_video.mp4)
+Here's a [link to my video result](./test_out.mp4)
 
 ---
 
 ### Discussion
 
-#### 1. Briefly discuss any problems / issues you faced in your implementation of this project.  Where will your pipeline likely fail?  What could you do to make it more robust?
+I think under more difficult conditions, shadows, and different color pavement my algorithm will probably run into troubles. 
 
-Here I'll talk about the approach I took, what techniques I used, what worked and why, where the pipeline might fail and how I might improve it if I were going to pursue this project further.  

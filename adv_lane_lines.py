@@ -47,6 +47,17 @@ def undistort(directory,ny,nx):
 
     return ret, mtx, dist
 
+def warp(undist):
+    img_size = (undist.shape[1],undist.shape[0])
+    src = np.float32([[572, 465], [712, 465], [285, 670], [1030, 670]])
+    dst = np.float32([[170, 0], [1030, 0], [170, 650], [1030, 650]])
+    # use cv2.getPerspectiveTransform() to get M, the transform matrix
+    M = cv2.getPerspectiveTransform(src, dst)
+    Minv = cv2.getPerspectiveTransform(dst, src)
+    # use cv2.warpPerspective() to warp your image to a top-down view
+    warped = cv2.warpPerspective(undist, M, img_size, flags=cv2.INTER_LINEAR)
+    return warped,Minv
+
 
 def abs_sobel_thresh(img, orient='x', sobel_kernel=3, thresh=(0, 255)):
 
@@ -87,16 +98,6 @@ def dir_threshold(img, sobel_kernel=3, thresh=(0, np.pi/2)):
     binary[(grad_dir>=thresh[0]) & (grad_dir<=thresh[1])]=1#
     return binary
 
-def warp(undist):
-    img_size = (undist.shape[1],undist.shape[0])
-    src = np.float32([[572, 465], [712, 465], [285, 670], [1030, 670]])
-    dst = np.float32([[170, 0], [1030, 0], [170, 650], [1030, 650]])
-    # use cv2.getPerspectiveTransform() to get M, the transform matrix
-    M = cv2.getPerspectiveTransform(src, dst)
-    Minv = cv2.getPerspectiveTransform(dst, src)
-    # use cv2.warpPerspective() to warp your image to a top-down view
-    warped = cv2.warpPerspective(undist, M, img_size, flags=cv2.INTER_LINEAR)
-    return warped,Minv
 
 def hls_select(img, h_thresh=(0, 255), l_thresh=(0, 255), s_thresh=(0, 255)):
     hls=cv2.cvtColor(img,cv2.COLOR_BGR2HLS) #Convert to HLS color space
@@ -300,10 +301,11 @@ dist_pickle=pickle.load(open( "camera_cal/wide_dist_pickle.p", "rb" ))
 
 # Testing functions on all images
 test_images = glob.glob('./test_images/test*.jpg')
-plt.figure(figsize=(15, 10))
+fig=plt.figure(figsize=(15, 10))
 
 for i in range(len(test_images)):
     img = cv2.imread(test_images[i])
+    imgRGB = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
     image_proc = main_pipeline(img)
     dst = cv2.undistort(img, dist_pickle['mtx'], dist_pickle['dist'], None, dist_pickle['mtx'])
     warped, Minv = warp(dst)
@@ -338,34 +340,34 @@ for i in range(len(test_images)):
     # Draw the lane onto the warped blank image
     cv2.fillPoly(window_img, np.int_([left_line_pts]), (0, 255, 0))
     cv2.fillPoly(window_img, np.int_([right_line_pts]), (0, 255, 0))
-    result = cv2.addWeighted(out_img, 1, window_img, 0.3, 0)
+    fitted_lane = cv2.addWeighted(out_img, 1, window_img, 0.3, 0)
     radius = np.minimum(right_curverad, left_curverad)
     offset = get_offset(img, left_fitx, right_fitx)
     font = cv2.FONT_HERSHEY_PLAIN
-    cv2.putText(result, 'Lane Curvature = '+"{:08.3f}".format(radius)+ ' m', (5, 50), font, 2, (255, 255, 255), 2, cv2.LINE_AA)
-    cv2.putText(result, 'Offset = '+"{:06.3f}".format(offset)+ ' m', (5, 80), font, 2, (255, 255, 255), 2, cv2.LINE_AA)
-
+    #cv2.putText(result, 'Lane Curvature = '+"{:08.3f}".format(radius)+ ' m', (5, 50), font, 2, (255, 255, 255), 2, cv2.LINE_AA)
+    #cv2.putText(result, 'Offset = '+"{:06.3f}".format(offset)+ ' m', (5, 80), font, 2, (255, 255, 255), 2, cv2.LINE_AA)
 
     #project back the image
-    #result=project_back(combined_binary, ploty, left_fitx, right_fitx, Minv, img, dst)
-    #resultRGB = cv2.cvtColor(result, cv2.COLOR_BGR2RGB)
+    result=project_back(combined_binary, ploty, left_fitx, right_fitx, Minv, img, dst)
+    resultRGB = cv2.cvtColor(result, cv2.COLOR_BGR2RGB)
 
     #visualize outputs on all test images
     plt.subplot(4, 4, 2 * (i + 1) - 1)
-    plt.imshow(combined_binary,cmap='gray')
+    plt.imshow(fitted_lane)
     plt.axis('off')
     plt.subplot(4, 4, 2 * (i + 1))
-    plt.imshow(result)
-    plt.plot(left_fitx, ploty, color='yellow')
-    plt.plot(right_fitx, ploty, color='yellow')
+    plt.imshow(resultRGB)
+    #plt.plot(left_fitx, ploty, color='yellow')
+    #plt.plot(right_fitx, ploty, color='yellow')
     plt.xlim(0, 1280)
     plt.ylim(720, 0)
     plt.axis('off')
     plt.tight_layout()
 
 #plt.show()
+#fig.savefig('./writeup/back_proj.png')
 
 
-clip = VideoFileClip("project_video.mp4")
+clip = VideoFileClip("challenge_video.mp4")
 project_clip = clip.fl_image(main_pipeline)
-project_clip.write_videofile('test_out.mp4',audio=False)
+project_clip.write_videofile('challenge_video_out.mp4',audio=False)

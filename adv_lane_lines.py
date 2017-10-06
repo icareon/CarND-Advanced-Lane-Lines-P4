@@ -52,8 +52,6 @@ def warp(undist):
     img_size = (undist.shape[1],undist.shape[0])
     src = np.float32([[560, 465], [712, 465], [220, 670], [1030, 670]])
     dst = np.float32([[170, 0], [1030, 0], [170, 650], [1030, 650]])
-    #src = np.float32([[585, 460], [203, 720], [1127, 720], [695, 460]])
-    #dst = np.float32([[320, 0], [320, 720], [960, 720], [960, 0]])
     # use cv2.getPerspectiveTransform() to get M, the transform matrix
     M = cv2.getPerspectiveTransform(src, dst)
     Minv = cv2.getPerspectiveTransform(dst, src)
@@ -140,13 +138,11 @@ def rgb_select(img, r_thresh=(0, 255), g_thresh=(0, 255), b_thresh=(0, 255)):
 def yw_combinator(warped,ry=(0, 255),gy=(0, 255),by=(0, 255),hw=(0, 255),lw=(0, 255),sw=(0, 255),hs=(0, 255),ls=(0, 255),ss=(0, 255)):
     #yello detection
     yello_binary = rgb_select(warped, r_thresh=ry, g_thresh=gy, b_thresh=by)
-    #yello_binary = hls_select(warped, r_thresh=ry, g_thresh=gy, b_thresh=by)
     #white detection
     white_binary=hls_select(warped,h_thresh = hw, l_thresh = lw, s_thresh = sw)
     #shadow detection
     shadow_binary=hls_select(warped,h_thresh = hs, l_thresh = ls, s_thresh = ss)
     line_binary=np.zeros_like(white_binary)
-#    line_binary[(white_binary==1) | (yello_binary==1)]=1
     line_binary[((white_binary==1) | (yello_binary==1)) & (shadow_binary==1)]=1
     return line_binary
 

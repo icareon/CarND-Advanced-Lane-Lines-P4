@@ -4,6 +4,7 @@ import glob
 import matplotlib.pyplot as plt
 import pickle
 from moviepy.editor import VideoFileClip
+import collections
 
 def undistort(directory,ny,nx):
     # prepare object points, like (0,0,0), (1,0,0), (2,0,0) ....,(6,5,0)
@@ -49,8 +50,10 @@ def undistort(directory,ny,nx):
 
 def warp(undist):
     img_size = (undist.shape[1],undist.shape[0])
-    src = np.float32([[572, 465], [712, 465], [285, 670], [1030, 670]])
+    src = np.float32([[560, 465], [712, 465], [220, 670], [1030, 670]])
     dst = np.float32([[170, 0], [1030, 0], [170, 650], [1030, 650]])
+    #src = np.float32([[585, 460], [203, 720], [1127, 720], [695, 460]])
+    #dst = np.float32([[320, 0], [320, 720], [960, 720], [960, 0]])
     # use cv2.getPerspectiveTransform() to get M, the transform matrix
     M = cv2.getPerspectiveTransform(src, dst)
     Minv = cv2.getPerspectiveTransform(dst, src)
@@ -102,7 +105,7 @@ def dir_threshold(img, sobel_kernel=3, thresh=(0, np.pi/2)):
 def hls_select(img, h_thresh=(0, 255), l_thresh=(0, 255), s_thresh=(0, 255)):
     hls=cv2.cvtColor(img,cv2.COLOR_BGR2HLS) #Convert to HLS color space
     h_channel = hls[:, :, 0]
-    l_channel=hls[:,:,1]
+    l_channel = hls[:, :, 1]
     s_channel = hls[:, :, 2]
     binary_h=np.zeros_like(h_channel)   # Apply a threshold to the S channel
     binary_h[(h_channel>h_thresh[0]) & (h_channel<=h_thresh[1])]=1  # Return a binary image of threshold result
@@ -116,14 +119,35 @@ def hls_select(img, h_thresh=(0, 255), l_thresh=(0, 255), s_thresh=(0, 255)):
     hls_binary[(binary_h == 1) & (binary_l == 1) & (binary_s == 1)] = 1
     return hls_binary
 
+def rgb_select(img, r_thresh=(0, 255), g_thresh=(0, 255), b_thresh=(0, 255)):
+    rgb=cv2.cvtColor(img,cv2.COLOR_BGR2RGB) #Convert to HLS color space
+    r_channel = rgb[:, :, 0]
+    g_channel = rgb[:, :, 1]
+    b_channel = rgb[:, :, 2]
+    binary_r=np.zeros_like(r_channel)   # Apply a threshold to the S channel
+    binary_r[(r_channel>r_thresh[0]) & (r_channel<=r_thresh[1])]=1  # Return a binary image of threshold result
+    binary_g=np.zeros_like(g_channel)   # Apply a threshold to the S channel
+    binary_g[(g_channel>g_thresh[0]) & (g_channel<=g_thresh[1])]=1  # Return a binary image of threshold result
+    binary_b=np.zeros_like(b_channel)   # Apply a threshold to the S channel
+    binary_b[(b_channel>b_thresh[0]) & (b_channel<=b_thresh[1])]=1  # Return a binary image of threshold result
 
-def yw_combinator(warped,hy=(0, 255),ly=(0, 255),sy=(0, 255),hw=(0, 255),lw=(0, 255),sw=(0, 255)):
+    # Combine the three binary thresholds and get the binary that satisfies all thresholds.
+    rgb_binary = np.zeros_like(binary_r)
+    rgb_binary[(binary_r == 1) & (binary_g == 1) & (binary_b == 1)] = 1
+    return rgb_binary
+
+
+def yw_combinator(warped,ry=(0, 255),gy=(0, 255),by=(0, 255),hw=(0, 255),lw=(0, 255),sw=(0, 255),hs=(0, 255),ls=(0, 255),ss=(0, 255)):
     #yello detection
-    yello_binary=hls_select(warped,h_thresh = hy, l_thresh = ly, s_thresh = sy)
+    yello_binary = rgb_select(warped, r_thresh=ry, g_thresh=gy, b_thresh=by)
+    #yello_binary = hls_select(warped, r_thresh=ry, g_thresh=gy, b_thresh=by)
     #white detection
     white_binary=hls_select(warped,h_thresh = hw, l_thresh = lw, s_thresh = sw)
+    #shadow detection
+    shadow_binary=hls_select(warped,h_thresh = hs, l_thresh = ls, s_thresh = ss)
     line_binary=np.zeros_like(white_binary)
-    line_binary[(white_binary==1) | (yello_binary==1)]=1
+#    line_binary[(white_binary==1) | (yello_binary==1)]=1
+    line_binary[((white_binary==1) | (yello_binary==1)) & (shadow_binary==1)]=1
     return line_binary
 
 
@@ -193,10 +217,12 @@ def find_lanes(binary_warped):
     # Extract left and right line pixel positions
     leftx = nonzerox[left_lane_inds]
     lefty = nonzeroy[left_lane_inds]
+
     rightx = nonzerox[right_lane_inds]
     righty = nonzeroy[right_lane_inds]
 
     # Fit a second order polynomial to each
+
     left_fit = np.polyfit(lefty, leftx, 2)
     right_fit = np.polyfit(righty, rightx, 2)
 
@@ -216,8 +242,8 @@ def get_curvature(ploty, leftx, rightx):
     y_eval = np.max(ploty)
 
     # Define conversions in x and y from pixels space to meters
-    ym_per_pix = 30 / 720  # meters per pixel in y dimension
-    xm_per_pix = 3.7 / 700  # meters per pixel in x dimension
+    ym_per_pix = 25 / 900  # meters per pixel in y dimension
+    xm_per_pix = 3.7 / 900  # meters per pixel in x dimension
 
     # Fit new polynomials to x,y in world space
     left_fit_cr = np.polyfit(ploty * ym_per_pix, leftx * xm_per_pix, 2)
@@ -233,7 +259,7 @@ def get_curvature(ploty, leftx, rightx):
 
 
 def get_offset(img, left_fitx, right_fitx ):
-    xm_per_pix = 3.7/700 # meters per pixel in x dimension
+    xm_per_pix = 3.7/900 # meters per pixel in x dimension
     lane_center = (right_fitx[-1]+left_fitx[-1])/2
     offset_pixels = lane_center-img.shape[1]/2
     offset_meters = offset_pixels * xm_per_pix
@@ -267,7 +293,7 @@ def main_pipeline(image):
     warped, Minv = warp(dst)
     ksize = 15  # Choose a larger odd number to smooth gradient measurements
     gradx = abs_sobel_thresh(warped, orient='x', sobel_kernel=ksize, thresh=(10, 100))
-    combined_binary = yw_combinator(warped, hy=(10, 30), ly=(30, 255), sy=(100, 255), hw=(0, 255), lw=(170, 255),sw=(0, 255))
+    combined_binary = yw_combinator(warped, ry=(200, 255), gy=(200, 255), by=(0, 255), hw=(0, 255), lw=(0, 255),sw=(140, 255),hs=(0, 255), ls=(140, 255),ss=(0, 255))
     #combined_all = np.zeros_like(img[:, :, 0])
     #combined_all[((gradx == 1) & (combined_binary == 1))] = 1
     out_img, ploty, left_fitx, right_fitx, left_lane_inds, right_lane_inds, margin, window_img = find_lanes(combined_binary)
@@ -319,7 +345,8 @@ for i in range(len(test_images)):
     dir_binary = dir_threshold(warped, sobel_kernel=15, thresh=(0.7, 1.2))
     y_binary = hls_select(warped, h_thresh=(10, 30), l_thresh=(50, 255), s_thresh=(100, 255))
     w_binary = hls_select(warped, h_thresh=(0, 255), l_thresh=(210, 255), s_thresh=(0, 255))
-    combined_binary = yw_combinator(warped, hy=(10, 30), ly=(50, 255), sy=(100, 255), hw=(0, 255), lw=(210, 255),sw=(0, 255))
+    combined_binary = yw_combinator(warped, ry=(200, 255), gy=(200, 255), by=(0, 255), hw=(0, 255), lw=(0, 255),sw=(140, 255),hs=(0, 255), ls=(140, 255),ss=(0, 255))
+
     combined_all=np.zeros_like(img[:,:,0])
     combined_all[((gradx == 1) & (combined_binary == 1))] = 1
 
@@ -354,20 +381,19 @@ for i in range(len(test_images)):
     #visualize outputs on all test images
     plt.subplot(4, 4, 2 * (i + 1) - 1)
     plt.imshow(fitted_lane)
+    plt.plot(left_fitx, ploty, color='yellow')
+    plt.plot(right_fitx, ploty, color='yellow')
     plt.axis('off')
     plt.subplot(4, 4, 2 * (i + 1))
     plt.imshow(resultRGB)
-    #plt.plot(left_fitx, ploty, color='yellow')
-    #plt.plot(right_fitx, ploty, color='yellow')
     plt.xlim(0, 1280)
     plt.ylim(720, 0)
     plt.axis('off')
     plt.tight_layout()
 
-#plt.show()
-#fig.savefig('./writeup/back_proj.png')
+plt.show()
+fig.savefig('./writeup/back_proj2.png')
 
-
-clip = VideoFileClip("challenge_video.mp4")
-project_clip = clip.fl_image(main_pipeline)
-project_clip.write_videofile('challenge_video_out.mp4',audio=False)
+# clip = VideoFileClip("project_video.mp4")
+# project_clip = clip.fl_image(main_pipeline)
+# project_clip.write_videofile('project_video_out2.mp4',audio=False)

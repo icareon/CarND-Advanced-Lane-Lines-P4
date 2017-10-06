@@ -69,5 +69,4 @@ Here's a [link to my video result](./test_out.mp4)
 
 ### Discussion
 
-I think under more difficult conditions, shadows, and different color pavement my algorithm will probably run into troubles. 
-
+I had severe issues with the shadows but was able to address it by using rgb thresholding and hls thresholding combined with shadow avoiding according to hwo it was explained in the forums.
